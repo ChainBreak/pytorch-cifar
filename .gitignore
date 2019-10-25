@@ -1,0 +1,10 @@
+
+data/cifar-10-batches-py/
+
+*.pyc
+
+\.vscode/settings\.json
+
+checkpoint/ckpt\.pth
+
+data/cifar-10-python\.tar\.gz
