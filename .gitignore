@@ -1,0 +1,12 @@
+
+checkpoint/ResNet/
+
+\.vscode/settings\.json
+
+checkpoint/
+
+*.pyc
+
+data/cifar-10-batches-py/
+
+data/
