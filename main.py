@@ -8,55 +8,14 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 
+from collections import OrderedDict
+
 import os
 import argparse
 
 from models import *
 from utils import progress_bar
 
-
-parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
-parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-args = parser.parse_args()
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-best_acc = 0  # best test accuracy
-start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-
-
-
-# Model
-print('==> Building model..')
-# net = VGG('VGG19')
-# net = ResNet18()
-# net = PreActResNet18()
-# net = GoogLeNet()
-# net = DenseNet121()
-# net = ResNeXt29_2x64d()
-# net = MobileNet()
-# net = MobileNetV2()
-# net = DPN92()
-# net = ShuffleNetG2()
-# net = SENet18()
-# net = ShuffleNetV2(1)
-net = EfficientNetB0()
-net = net.to(device)
-if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
-
-if args.resume:
-    # Load checkpoint.
-    print('==> Resuming from checkpoint..')
-    assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./checkpoint/ckpt.pth')
-    net.load_state_dict(checkpoint['net'])
-    best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
 # Training
 def train(epoch):
@@ -120,7 +79,30 @@ def test(epoch):
 #     train(epoch)
 #     test(epoch)
 
-def build_parameter_groups(p):
+class FeatureShapeExtractor():
+
+    def __call__(self,net,input_shape):
+        self.hook_handles = []
+        self.module_shape_dict = OrderedDict()
+
+        net.apply(self.hook_adder)
+        rand_input = torch.rand(input_shape)
+        net(rand_input)
+
+        for hook_handle in self.hook_handles:
+            hook_handle.remove()
+
+        return self.module_shape_dict
+
+    def hook_adder(self,module):
+        children_count = len(list(module.children()))
+        if children_count == 0:
+            self.hook_handles.append ( module.register_forward_pre_hook(self.forward_pre_hook) )
+
+    def forward_pre_hook(self,module,input_tensor):
+        self.module_shape_dict[module] = input_tensor[0].shape
+        
+
     
 
 
@@ -154,8 +136,8 @@ def run_experiment(p):
     ### CRITERION ###
     criterion = nn.CrossEntropyLoss()
 
-    if p["use_param_groups"]
-    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    # if p["use_param_groups"]
+    # optimizer = optim.SGD(p["net"].parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
 
 
 #create a list of all the model constructors and their arguments
@@ -172,7 +154,7 @@ net_list = [
     # ( ShuffleNetG2      ,()         ),
     ( SENet18           ,()         ),
     ( ShuffleNetV2      ,(1,)       ),
-    ( EfficientNetB0    ,()         ),
+    # ( EfficientNetB0    ,()         ),
 ]
 
 #create a parameter dictionary that holds the params for the experiments
@@ -190,6 +172,11 @@ for net_class, net_args in net_list:
     p["net_name"] = net_class.__name__
     p["net"] = net_class(*net_args)
     
+    print(p["net_name"])
+    f = FeatureShapeExtractor()
+    m = f(p["net"],(1,3,32,32))
+    print(m)
+    continue
 
     p1 = p.copy()
     p1["use_param_groups"] = False
